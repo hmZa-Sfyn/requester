@@ -1,0 +1,4 @@
+github.com/chzyer/readline v1.5.1 h1:upd/6fQk4src78LMRzh5vItIt361/o4uq553V8B5sGI=
+github.com/chzyer/readline v1.5.1/go.mod h1:Eh+b79XXUwfKfcPLepksvw2tcLE/Ct21YObkaSkeBlk=
+golang.org/x/sys v0.21.0 h1:rF+pYz3DAGSQAxAu1CbC7catMg/xAi4mNJMi5rTXTCs=
+golang.org/x/sys v0.21.0/go.mod h1:/VUhepiaJMbufDG0WoTRtORmkNJcez1Y+1hbFNG3yms=

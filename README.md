@@ -1,133 +1,114 @@
-# req — HTTP request engine (Go CLI, browser-spoof edition)
+# req — curl-like HTTP engine (Go CLI)
 
-A curl-like HTTP client with a functional REPL, request history, and a rendered
-headers box — all in a single Go file with **zero external dependencies**.
+Interactive HTTP client with arrow-key history, tab completion, browser spoofing,
+and zero bloat. Single binary, two dependencies.
 
 ## Build
 
 ```bash
 cd req
+go mod tidy        # downloads readline + golang.org/x/sys
 go build -o req .
 ```
 
-Or install globally:
+Install globally:
 
 ```bash
 go install .
-# then use `req` from anywhere
 ```
 
 ## Usage
 
-### One-shot (like curl)
-
-```bash
-req GET  https://jsonplaceholder.typicode.com/posts/1
-req POST https://jsonplaceholder.typicode.com/posts '{"title":"hi","body":"yo","userId":1}'
-req https://httpbin.org/get          # shorthand — defaults to GET
-```
-
-### REPL mode
+### Interactive REPL
 
 ```bash
 req
 ```
 
-```
-req › GET https://jsonplaceholder.typicode.com/posts/1
+Full readline experience — same feel as bash/zsh:
 
-req › set Authorization "Bearer my-token"
-req › set X-App-Version 2.1
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Scroll command history |
+| `←` / `→` | Move cursor inside the line |
+| `Ctrl-A` | Jump to start of line |
+| `Ctrl-E` | Jump to end of line |
+| `Ctrl-R` | Incremental history search |
+| `Ctrl-W` | Delete word backwards |
+| `Ctrl-L` | Clear screen |
+| `Ctrl-D` | Quit |
+| `Tab` | Autocomplete commands, sub-commands, profile names |
 
-req › headers              # shows header box
+History is persisted to `~/.req_history` (up to 500 entries) across sessions.
 
-req › base https://api.example.com
-[https://api.example.com] › GET /users
-[https://api.example.com] › POST /users {"name":"alice"}
-
-req › history              # shows history box (last 20 requests)
-req › replay 2             # replay entry #2
-
-req › clear headers        # wipe headers
-req › clear history        # wipe history
-req › clear                # wipe both
-
-req › help
-req › quit
-```
-
-## Browser spoofing
+### One-shot CLI
 
 ```bash
-req --spoof GET https://httpbin.org/headers   # one-shot with full spoof
+req GET  https://httpbin.org/get
+req POST https://httpbin.org/post '{"name":"alice"}'
+req --spoof GET https://httpbin.org/headers   # full browser spoof
+req https://example.com                        # GET shorthand
 ```
 
-Inside the REPL:
+## REPL commands
 
+### Requests
 ```
-req › spoof on                    # enable (random profile each request)
-req › spoof profile chrome-win    # pin to a specific browser
-req › spoof profile random        # back to random
-req › spoof rotate on             # change profile on every request
-req › spoof ua on                 # randomise Chrome/Firefox minor version
-req › spoof lang on               # rotate Accept-Language locale strings
-req › spoof referer on            # chain Referer from previous URL
-req › spoof delay 200 800         # wait 200–800 ms before each request
-req › spoof delay off
-req › spoof profiles              # list all available profiles
-req › spoof status                # show current config box
+GET    <url> [body]
+POST   <url> [body]
+PUT    <url> [body]
+PATCH  <url> [body]
+DELETE <url>
 ```
 
-### What gets injected
+### Session
+```
+set    <key> <value>       set a request header
+unset  <key>               remove a header
+base   <url>               set URL prefix (then use /path shorthand)
+headers                    show headers box
+history                    show last 50 requests
+replay <n>                 re-fire history entry n
+cookies                    cookie jar info
+clear  [headers|history|cookies]
+```
+
+### Browser spoof
+```
+spoof on / off
+spoof status
+spoof profiles                     list all profiles
+spoof profile <name|random>        pin or randomise profile
+spoof rotate  on|off               new profile every request
+spoof ua      on|off               randomise Chrome/Firefox version
+spoof lang    on|off               rotate Accept-Language
+spoof referer on|off               chain Referer header
+spoof delay   <min_ms> <max_ms>    human-like random delay
+spoof delay   off
+```
+
+**Profiles:** `chrome-win` · `chrome-mac` · `chrome-android` · `firefox-win` · `firefox-linux` · `safari-mac` · `edge-win`
+
+### What spoof injects
 
 | Header | Detail |
 |--------|--------|
-| `User-Agent` | Real Chrome/Firefox/Safari/Edge UA with optional version randomisation |
-| `Accept` | Exact browser accept string (differs per browser) |
+| `User-Agent` | Real browser string with optional version jitter |
+| `Accept` | Per-browser exact value |
 | `Accept-Encoding` | `gzip, deflate, br` |
-| `Accept-Language` | Rotated from pool of real locale strings |
+| `Accept-Language` | Rotated from locale pool |
 | `Cache-Control` | `max-age=0` (Chrome/Edge) |
-| `Sec-Fetch-*` | Full `Dest`, `Mode`, `Site`, `User` set |
-| `Sec-CH-UA` | Client hints with correct brand/version |
-| `Sec-CH-UA-Mobile` | `?0` (desktop) or `?1` (Android) |
-| `Sec-CH-UA-Platform` | `"Windows"`, `"macOS"`, `"Android"` etc. |
-| `Referer` | Chained from previous request (optional) |
-| `DNT` | Randomly included (1-in-3 requests) |
-| `TE` | `trailers` for Firefox profiles |
-| Cookies | Automatically stored & sent via session jar |
-| Redirects | Spoofed headers are preserved through redirect chains |
+| `Sec-Fetch-*` | Full set (`Dest`, `Mode`, `Site`, `User`) |
+| `Sec-CH-UA` + `Sec-CH-UA-*` | Client hints |
+| `Referer` | Chained from previous URL |
+| `DNT` | Randomly on 1-in-3 requests |
+| `TE: trailers` | Firefox only |
+| Cookies | Persisted per-domain in session jar |
+| Redirects | Spoof headers survive all redirects |
 
-### Available profiles
+## Dependencies
 
-`chrome-win` · `chrome-mac` · `chrome-android` · `firefox-win` · `firefox-linux` · `safari-mac` · `edge-win`
-
-## Features
-
-| Feature | Detail |
-|---------|--------|
-| Methods | GET POST PUT PATCH DELETE HEAD OPTIONS |
-| Headers | per-session, persistent, box display |
-| Base URL | set once, prefix all relative paths |
-| History | last 20 entries, replay by index |
-| JSON body | pass inline as last arg |
-| Pretty JSON | syntax-highlighted response body |
-| Response headers | shown in box after each request |
-| ANSI colours | status codes, keys, values, timing |
-| Zero deps | stdlib only, single binary |
-
-## Response display
-
-```
-200 OK  43ms
-
-╭─ Response Headers ──────────────────────╮
-│ Content-Type: application/json          │
-│ Cache-Control: max-age=43200            │
-╰─────────────────────────────────────────╯
-
-{
-  "id": 1,
-  "title": "sunt aut facere ...",
-  "body": "quia et suscipit ..."
-}
-```
+| Package | Why |
+|---------|-----|
+| `github.com/chzyer/readline` | Arrow keys, Ctrl-R, Tab completion, history file |
+| `golang.org/x/sys` | Required by readline for raw terminal mode |
